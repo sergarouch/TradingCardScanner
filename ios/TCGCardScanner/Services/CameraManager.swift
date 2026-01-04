@@ -5,6 +5,7 @@
 
 import AVFoundation
 import UIKit
+import Vision
 
 class CameraManager: NSObject, ObservableObject {
     @Published var isFlashOn = false
@@ -171,6 +172,47 @@ extension CameraManager: AVCapturePhotoCaptureDelegate {
         }
         
         return UIImage(cgImage: cgImage, scale: image.scale, orientation: image.imageOrientation)
+    }
+    
+    // MARK: - OCR Text Recognition
+    
+    func recognizeText(in image: UIImage, completion: @escaping (String?) -> Void) {
+        guard let cgImage = image.cgImage else {
+            completion(nil)
+            return
+        }
+        
+        let request = VNRecognizeTextRequest { request, error in
+            guard error == nil,
+                  let observations = request.results as? [VNRecognizedTextObservation] else {
+                completion(nil)
+                return
+            }
+            
+            // Extract text from the top portion of the card (where the name usually is)
+            let topTexts = observations
+                .filter { $0.boundingBox.minY > 0.7 } // Top 30% of image
+                .compactMap { $0.topCandidates(1).first?.string }
+            
+            // Get the most likely card name (usually the largest/most prominent text at top)
+            let cardName = topTexts.first ?? observations.first?.topCandidates(1).first?.string
+            
+            completion(cardName)
+        }
+        
+        request.recognitionLevel = .accurate
+        request.usesLanguageCorrection = true
+        
+        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+        
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                try handler.perform([request])
+            } catch {
+                print("OCR Error: \(error)")
+                completion(nil)
+            }
+        }
     }
 }
 

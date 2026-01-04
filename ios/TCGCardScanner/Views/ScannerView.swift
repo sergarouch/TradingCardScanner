@@ -264,32 +264,37 @@ struct ScannerView: View {
         isProcessing = true
         appState.isScanning = true
         
-        Task {
-            do {
-                let result = try await APIService.shared.identifyCard(
-                    image: image,
-                    serverURL: appState.serverURL
-                )
-                
-                await MainActor.run {
-                    isProcessing = false
-                    appState.isScanning = false
+        // First, try to read the card name using OCR
+        cameraManager.recognizeText(in: image) { detectedName in
+            Task {
+                do {
+                    let result = try await APIService.shared.identifyCard(
+                        image: image,
+                        serverURL: appState.serverURL,
+                        cardNameHint: detectedName // Pass detected card name
+                    )
                     
-                    if let card = result {
-                        scanResult = card
-                        appState.addScannedCard(card)
-                        showingResult = true
-                    } else {
-                        errorMessage = "Could not identify the card. Try adjusting the angle or lighting."
+                    await MainActor.run {
+                        isProcessing = false
+                        appState.isScanning = false
+                        
+                        if let card = result {
+                            scanResult = card
+                            appState.addScannedCard(card)
+                            showingResult = true
+                        } else {
+                            // If no result, prompt user to search manually
+                            errorMessage = "Could not identify the card.\n\nDetected text: \(detectedName ?? "none")\n\nTry searching manually in the Search tab."
+                            showingError = true
+                        }
+                    }
+                } catch {
+                    await MainActor.run {
+                        isProcessing = false
+                        appState.isScanning = false
+                        errorMessage = error.localizedDescription
                         showingError = true
                     }
-                }
-            } catch {
-                await MainActor.run {
-                    isProcessing = false
-                    appState.isScanning = false
-                    errorMessage = error.localizedDescription
-                    showingError = true
                 }
             }
         }

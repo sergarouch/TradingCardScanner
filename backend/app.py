@@ -210,14 +210,18 @@ def identify_and_price():
                     }
                     
         # If no match but we have a name hint, search TCGPlayer
-        elif card_name_hint:
-            price = tcg_service.get_price_by_name(card_name_hint, category)
+        if card_name_hint and not card_info:
+            # Clean up the detected text for better search results
+            search_query = card_name_hint.strip()
+            
+            # Try to get price by name
+            price = tcg_service.get_price_by_name(search_query, category)
             if price:
                 card_info = {
                     'name': price.card_name,
                     'set_name': price.set_name,
                     'category': price.tcg_category,
-                    'match_confidence': 0.5  # Lower confidence for hint-based search
+                    'match_confidence': 0.7  # OCR-based search confidence
                 }
                 pricing_info = {
                     'market_price': price.market_price,
@@ -227,6 +231,25 @@ def identify_and_price():
                     'condition': price.condition,
                     'tcgplayer_url': price.tcgplayer_url
                 }
+            else:
+                # Try a direct search if get_price_by_name fails
+                search_results = tcg_service.search_cards(search_query, category, limit=1)
+                if search_results:
+                    top_result = search_results[0]
+                    card_info = {
+                        'name': top_result.name,
+                        'set_name': top_result.set_name,
+                        'category': top_result.category or category,
+                        'match_confidence': 0.6
+                    }
+                    pricing_info = {
+                        'market_price': top_result.price_summary.get('market'),
+                        'low_price': None,
+                        'mid_price': None,
+                        'high_price': None,
+                        'condition': 'Near Mint',
+                        'tcgplayer_url': top_result.tcgplayer_url
+                    }
                 
         return jsonify({
             'success': True,
