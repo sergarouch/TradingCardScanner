@@ -15,6 +15,7 @@
 		006 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 106; };
 		007 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 107; };
 		008 /* CameraManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 108; };
+		014 /* CollectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 114; };
 		009 /* TCGPlayerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 109; };
 		010 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 110; };
 		011 /* CardRecognitionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 112; };
@@ -36,6 +37,7 @@
 		111 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		112 /* CardRecognitionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardRecognitionService.swift; sourceTree = "<group>"; };
 		113 /* SharedViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedViews.swift; sourceTree = "<group>"; };
+		114 /* CollectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -77,6 +79,7 @@
 				106 /* SearchView.swift */,
 				107 /* SettingsView.swift */,
 				113 /* SharedViews.swift */,
+				114 /* CollectionView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -159,6 +162,7 @@
 				009 /* TCGPlayerService.swift in Sources */,
 				011 /* CardRecognitionService.swift in Sources */,
 				013 /* SharedViews.swift in Sources */,
+				014 /* CollectionView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -306,7 +310,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TCGCardScanner/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "TCG Scanner";
+				INFOPLIST_KEY_CFBundleDisplayName = "Trading Card Scanner";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSCameraUsageDescription = "TCG Card Scanner needs camera access to scan and identify your trading cards";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "TCG Card Scanner needs photo library access to save scanned card images";
@@ -339,7 +343,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TCGCardScanner/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "TCG Scanner";
+				INFOPLIST_KEY_CFBundleDisplayName = "Trading Card Scanner";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSCameraUsageDescription = "TCG Card Scanner needs camera access to scan and identify your trading cards";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "TCG Card Scanner needs photo library access to save scanned card images";

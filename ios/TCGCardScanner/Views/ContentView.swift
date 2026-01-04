@@ -10,7 +10,7 @@ struct ContentView: View {
     @State private var selectedTab: Tab = .scan
     
     enum Tab {
-        case scan, history, search, settings
+        case scan, collection, history, search, settings
     }
     
     var body: some View {
@@ -33,6 +33,12 @@ struct ContentView: View {
                         Label("Scan", systemImage: "camera.viewfinder")
                     }
                     .tag(Tab.scan)
+                
+                CollectionView()
+                    .tabItem {
+                        Label("Collection", systemImage: "square.grid.2x2")
+                    }
+                    .tag(Tab.collection)
                 
                 HistoryView()
                     .tabItem {

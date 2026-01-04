@@ -70,7 +70,7 @@ struct ScannerView: View {
     private var headerView: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text("TCG Scanner")
+                Text("Trading Card Scanner")
                     .font(.system(size: 28, weight: .bold, design: .rounded))
                     .foregroundStyle(
                         LinearGradient(
@@ -80,9 +80,9 @@ struct ScannerView: View {
                         )
                     )
                 
-                Text("100% On-Device • No Server Needed")
+                Text("Position card within frame")
                     .font(.caption)
-                    .foregroundColor(Color(hex: "00ff88"))
+                    .foregroundColor(.white.opacity(0.7))
             }
             
             Spacer()
@@ -293,32 +293,63 @@ struct ScannerView: View {
                 }
                 
                 // Step 2: Search TCGPlayer for the card
-                let results = try await TCGPlayerService.shared.searchCards(
-                    query: cardName,
-                    category: recognition.category != "Unknown" ? recognition.category : nil
-                )
-                
-                await MainActor.run {
-                    isProcessing = false
-                    appState.isScanning = false
-                    detectedCardName = nil
+                    // Search TCGPlayer for the detected card name
+                    let results = try await TCGPlayerService.shared.searchCards(
+                        query: cardName,
+                        category: mapCategoryToTCGPlayer(recognition.category)
+                    )
                     
-                    if let topResult = results.first {
-                        let imageData = image.jpegData(compressionQuality: 0.5)
-                        let scannedCard = ScannedCard(
-                            from: topResult,
-                            imageData: imageData,
-                            confidence: recognition.confidence,
-                            detectedText: cardName
-                        )
-                        scanResult = scannedCard
-                        appState.addScannedCard(scannedCard)
-                        showingResult = true
-                    } else {
-                        errorMessage = "Card '\(cardName)' not found on TCGPlayer.\n\nTry searching with a different name in the Search tab."
-                        showingError = true
+                    await MainActor.run {
+                        isProcessing = false
+                        appState.isScanning = false
+                        detectedCardName = nil
+                        
+                        if let topResult = results.first {
+                            let imageData = image.jpegData(compressionQuality: 0.5)
+                            let scannedCard = ScannedCard(
+                                from: topResult,
+                                imageData: imageData,
+                                confidence: recognition.confidence,
+                                detectedText: cardName
+                            )
+                            scanResult = scannedCard
+                            appState.addScannedCard(scannedCard)
+                            showingResult = true
+                        } else {
+                            // If no exact match, try searching without category filter
+                            Task {
+                                do {
+                                    let broaderResults = try await TCGPlayerService.shared.searchCards(
+                                        query: cardName,
+                                        category: nil
+                                    )
+                                    
+                                    await MainActor.run {
+                                        if let topResult = broaderResults.first {
+                                            let imageData = image.jpegData(compressionQuality: 0.5)
+                                            let scannedCard = ScannedCard(
+                                                from: topResult,
+                                                imageData: imageData,
+                                                confidence: recognition.confidence * 0.8, // Lower confidence for broader search
+                                                detectedText: cardName
+                                            )
+                                            scanResult = scannedCard
+                                            appState.addScannedCard(scannedCard)
+                                            showingResult = true
+                                        } else {
+                                            errorMessage = "Card '\(cardName)' not found on TCGPlayer.\n\nDetected text: \(cardName)\n\nTry searching manually in the Search tab or scan again with better lighting."
+                                            showingError = true
+                                        }
+                                    }
+                                } catch {
+                                    await MainActor.run {
+                                        errorMessage = "Could not find card '\(cardName)' on TCGPlayer.\n\nError: \(error.localizedDescription)\n\nTry searching manually in the Search tab."
+                                        showingError = true
+                                    }
+                                }
+                            }
+                        }
                     }
-                }
                 
             } catch {
                 await MainActor.run {
@@ -354,6 +385,20 @@ struct CameraPreviewView: UIViewRepresentable {
         if let previewLayer = cameraManager.previewLayer {
             previewLayer.frame = uiView.bounds
         }
+    }
+}
+
+// MARK: - Helper Functions
+
+func mapCategoryToTCGPlayer(_ category: String) -> String? {
+    switch category.lowercased() {
+    case "pokemon": return "pokemon"
+    case "magic: the gathering", "trading card": return "magic"
+    case "yu-gi-oh!", "yugioh": return "yugioh"
+    case "sports": return "sports"
+    case "one piece": return "one piece"
+    case "disney lorcana", "lorcana": return "lorcana"
+    default: return nil
     }
 }
 
