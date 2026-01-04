@@ -217,15 +217,17 @@ class TCGPlayerService {
             
             var bracketCount = 0
             var jsonEndIndex = jsonDataStart.lowerBound
+            var currentIndex = jsonDataStart.lowerBound
             
-            for i in html.index(jsonDataStart.lowerBound, offsetBy: 0)..<html.endIndex {
-                let char = html[i]
+            while currentIndex < html.endIndex {
+                let char = html[currentIndex]
                 if char == "[" { bracketCount += 1 }
                 if char == "]" { bracketCount -= 1 }
                 if bracketCount == 0 {
-                    jsonEndIndex = html.index(after: i)
+                    jsonEndIndex = html.index(after: currentIndex)
                     break
                 }
+                currentIndex = html.index(after: currentIndex)
             }
             
             let jsonStr = String(html[jsonDataStart.lowerBound..<jsonEndIndex])
