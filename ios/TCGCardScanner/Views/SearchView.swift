@@ -2,6 +2,8 @@
 //  SearchView.swift
 //  TCGCardScanner
 //
+//  Direct TCGPlayer search - no server needed!
+//
 
 import SwiftUI
 
@@ -9,7 +11,7 @@ struct SearchView: View {
     @EnvironmentObject var appState: AppState
     @State private var searchText = ""
     @State private var selectedCategory: String?
-    @State private var searchResults: [SearchResult] = []
+    @State private var searchResults: [TCGCard] = []
     @State private var isSearching = false
     @State private var hasSearched = false
     @State private var errorMessage: String?
@@ -17,11 +19,11 @@ struct SearchView: View {
     let categories = [
         ("All", nil as String?),
         ("Pokémon", "pokemon"),
-        ("MTG", "magic_the_gathering"),
+        ("MTG", "magic"),
         ("Yu-Gi-Oh!", "yugioh"),
         ("Sports", "sports"),
-        ("One Piece", "one_piece"),
-        ("Lorcana", "disney_lorcana")
+        ("One Piece", "one piece"),
+        ("Lorcana", "lorcana")
     ]
     
     var body: some View {
@@ -154,8 +156,8 @@ struct SearchView: View {
     private var resultsListView: some View {
         ScrollView {
             LazyVStack(spacing: 16) {
-                ForEach(searchResults) { result in
-                    SearchResultRow(result: result)
+                ForEach(searchResults) { card in
+                    TCGCardRow(card: card)
                 }
             }
             .padding(.horizontal, 20)
@@ -236,6 +238,11 @@ struct SearchView: View {
                     .font(.subheadline)
                     .foregroundColor(.white.opacity(0.6))
                     .multilineTextAlignment(.center)
+                
+                Text("Direct search • No server needed")
+                    .font(.caption)
+                    .foregroundColor(Color(hex: "00ff88"))
+                    .padding(.top, 4)
             }
             
             // Quick search suggestions
@@ -253,7 +260,7 @@ struct SearchView: View {
                     
                     QuickSearchChip(text: "Black Lotus") {
                         searchText = "Black Lotus"
-                        selectedCategory = "magic_the_gathering"
+                        selectedCategory = "magic"
                         performSearch()
                     }
                     
@@ -317,10 +324,9 @@ struct SearchView: View {
         
         Task {
             do {
-                let results = try await APIService.shared.searchCards(
+                let results = try await TCGPlayerService.shared.searchCards(
                     query: searchText,
-                    category: selectedCategory,
-                    serverURL: appState.serverURL
+                    category: selectedCategory
                 )
                 
                 await MainActor.run {
@@ -337,17 +343,17 @@ struct SearchView: View {
     }
 }
 
-// MARK: - Search Result Row
+// MARK: - TCG Card Row
 
-struct SearchResultRow: View {
-    let result: SearchResult
+struct TCGCardRow: View {
+    let card: TCGCard
     @State private var showingDetail = false
     
     var body: some View {
         Button(action: { showingDetail = true }) {
             HStack(spacing: 16) {
                 // Card image
-                AsyncImage(url: URL(string: result.imageUrl ?? "")) { phase in
+                AsyncImage(url: URL(string: card.imageURL ?? "")) { phase in
                     switch phase {
                     case .success(let image):
                         image
@@ -368,19 +374,19 @@ struct SearchResultRow: View {
                 
                 // Card info
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(result.name)
+                    Text(card.name)
                         .font(.headline)
                         .foregroundColor(.white)
                         .lineLimit(2)
                     
-                    Text(result.setName)
+                    Text(card.setName)
                         .font(.subheadline)
                         .foregroundColor(.white.opacity(0.6))
                         .lineLimit(1)
                     
                     CategoryBadge(
-                        text: result.category.capitalized,
-                        color: Color(hex: "00d4ff")
+                        text: card.category,
+                        color: categoryColor(for: card.category)
                     )
                 }
                 
@@ -388,7 +394,7 @@ struct SearchResultRow: View {
                 
                 // Price
                 VStack(alignment: .trailing, spacing: 4) {
-                    if let price = result.marketPrice {
+                    if let price = card.marketPrice {
                         Text(String(format: "$%.2f", price))
                             .font(.headline.bold())
                             .foregroundColor(Color(hex: "00ff88"))
@@ -414,9 +420,19 @@ struct SearchResultRow: View {
             )
         }
         .sheet(isPresented: $showingDetail) {
-            if let url = URL(string: result.tcgplayerUrl) {
+            if let url = URL(string: card.productURL) {
                 SafariView(url: url)
             }
+        }
+    }
+    
+    private func categoryColor(for category: String) -> Color {
+        switch category.lowercased() {
+        case "pokemon": return Color(hex: "ffd700")
+        case "magic: the gathering", "magic": return Color(hex: "9d4edd")
+        case "yu-gi-oh!", "yugioh": return Color(hex: "ff006e")
+        case "sports": return Color(hex: "00ff88")
+        default: return Color(hex: "00d4ff")
         }
     }
 }
@@ -450,4 +466,3 @@ struct QuickSearchChip: View {
     SearchView()
         .environmentObject(AppState())
 }
-

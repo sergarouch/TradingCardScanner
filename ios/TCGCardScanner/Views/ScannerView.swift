@@ -2,6 +2,8 @@
 //  ScannerView.swift
 //  TCGCardScanner
 //
+//  Fully on-device card scanning - no server needed!
+//
 
 import SwiftUI
 import AVFoundation
@@ -11,10 +13,12 @@ struct ScannerView: View {
     @StateObject private var cameraManager = CameraManager()
     @State private var capturedImage: UIImage?
     @State private var isProcessing = false
+    @State private var processingStatus = "Analyzing..."
     @State private var scanResult: ScannedCard?
     @State private var showingResult = false
     @State private var errorMessage: String?
     @State private var showingError = false
+    @State private var detectedCardName: String?
     
     var body: some View {
         ZStack {
@@ -51,7 +55,10 @@ struct ScannerView: View {
                 CardResultView(card: card)
             }
         }
-        .alert("Scan Error", isPresented: $showingError) {
+        .alert("Scan Result", isPresented: $showingError) {
+            Button("Search Manually") {
+                // Could navigate to search tab
+            }
             Button("OK", role: .cancel) { }
         } message: {
             Text(errorMessage ?? "Unknown error occurred")
@@ -73,9 +80,9 @@ struct ScannerView: View {
                         )
                     )
                 
-                Text("Position card within frame")
-                    .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.7))
+                Text("100% On-Device • No Server Needed")
+                    .font(.caption)
+                    .foregroundColor(Color(hex: "00ff88"))
             }
             
             Spacer()
@@ -129,22 +136,20 @@ struct ScannerView: View {
             }
             .frame(width: 280, height: 390)
             
-            // Scanning animation
-            if appState.isScanning {
-                Rectangle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.clear, Color(hex: "00d4ff").opacity(0.3), Color.clear],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .frame(height: 60)
-                    .offset(y: -150)
-                    .animation(
-                        Animation.easeInOut(duration: 1.5).repeatForever(autoreverses: true),
-                        value: appState.isScanning
-                    )
+            // Detected text preview
+            if let cardName = detectedCardName {
+                VStack {
+                    Spacer()
+                    Text("Detected: \(cardName)")
+                        .font(.caption.bold())
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color(hex: "00d4ff").opacity(0.8))
+                        .cornerRadius(8)
+                        .padding(.bottom, 8)
+                }
+                .frame(width: 280, height: 390)
             }
         }
     }
@@ -200,7 +205,7 @@ struct ScannerView: View {
     
     private var processingOverlay: some View {
         ZStack {
-            Color.black.opacity(0.7)
+            Color.black.opacity(0.8)
                 .ignoresSafeArea()
             
             VStack(spacing: 24) {
@@ -233,11 +238,11 @@ struct ScannerView: View {
                 }
                 
                 VStack(spacing: 8) {
-                    Text("Analyzing Card")
+                    Text(processingStatus)
                         .font(.title2.bold())
                         .foregroundColor(.white)
                     
-                    Text("Identifying and fetching price...")
+                    Text("Processing on-device...")
                         .font(.subheadline)
                         .foregroundColor(.white.opacity(0.7))
                 }
@@ -263,38 +268,65 @@ struct ScannerView: View {
     private func processImage(_ image: UIImage) {
         isProcessing = true
         appState.isScanning = true
+        processingStatus = "Reading card text..."
         
-        // First, try to read the card name using OCR
-        cameraManager.recognizeText(in: image) { detectedName in
-            Task {
-                do {
-                    let result = try await APIService.shared.identifyCard(
-                        image: image,
-                        serverURL: appState.serverURL,
-                        cardNameHint: detectedName // Pass detected card name
-                    )
-                    
+        Task {
+            do {
+                // Step 1: OCR - Read text from card
+                let recognition = try await CardRecognitionService.shared.recognizeCard(from: image)
+                
+                guard let cardName = recognition.detectedName else {
                     await MainActor.run {
                         isProcessing = false
                         appState.isScanning = false
                         
-                        if let card = result {
-                            scanResult = card
-                            appState.addScannedCard(card)
-                            showingResult = true
-                        } else {
-                            // If no result, prompt user to search manually
-                            errorMessage = "Could not identify the card.\n\nDetected text: \(detectedName ?? "none")\n\nTry searching manually in the Search tab."
-                            showingError = true
-                        }
-                    }
-                } catch {
-                    await MainActor.run {
-                        isProcessing = false
-                        appState.isScanning = false
-                        errorMessage = error.localizedDescription
+                        let allText = recognition.allDetectedText.map { $0.text }.joined(separator: ", ")
+                        errorMessage = "Could not identify card name.\n\nDetected text: \(allText.isEmpty ? "None" : allText)\n\nTry the Search tab to find your card manually."
                         showingError = true
                     }
+                    return
+                }
+                
+                await MainActor.run {
+                    processingStatus = "Searching TCGPlayer..."
+                    detectedCardName = cardName
+                }
+                
+                // Step 2: Search TCGPlayer for the card
+                let results = try await TCGPlayerService.shared.searchCards(
+                    query: cardName,
+                    category: recognition.category != "Unknown" ? recognition.category : nil
+                )
+                
+                await MainActor.run {
+                    isProcessing = false
+                    appState.isScanning = false
+                    detectedCardName = nil
+                    
+                    if let topResult = results.first {
+                        let imageData = image.jpegData(compressionQuality: 0.5)
+                        let scannedCard = ScannedCard(
+                            from: topResult,
+                            imageData: imageData,
+                            confidence: recognition.confidence,
+                            detectedText: cardName
+                        )
+                        scanResult = scannedCard
+                        appState.addScannedCard(scannedCard)
+                        showingResult = true
+                    } else {
+                        errorMessage = "Card '\(cardName)' not found on TCGPlayer.\n\nTry searching with a different name in the Search tab."
+                        showingError = true
+                    }
+                }
+                
+            } catch {
+                await MainActor.run {
+                    isProcessing = false
+                    appState.isScanning = false
+                    detectedCardName = nil
+                    errorMessage = "Error: \(error.localizedDescription)"
+                    showingError = true
                 }
             }
         }
@@ -329,4 +361,3 @@ struct CameraPreviewView: UIViewRepresentable {
     ScannerView()
         .environmentObject(AppState())
 }
-

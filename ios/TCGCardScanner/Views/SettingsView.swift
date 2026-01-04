@@ -2,19 +2,14 @@
 //  SettingsView.swift
 //  TCGCardScanner
 //
+//  App settings - fully on-device, no server config needed!
+//
 
 import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var appState: AppState
-    @State private var serverURL: String = ""
-    @State private var isCheckingServer = false
-    @State private var serverStatus: ServerStatus = .unknown
-    @State private var showingURLEditor = false
-    
-    enum ServerStatus {
-        case unknown, checking, online, offline
-    }
+    @State private var showingClearAlert = false
     
     var body: some View {
         NavigationStack {
@@ -33,11 +28,14 @@ struct SettingsView: View {
                 
                 ScrollView {
                     VStack(spacing: 24) {
-                        // Server settings
-                        serverSection
+                        // Status banner
+                        statusBanner
                         
                         // App info
                         appInfoSection
+                        
+                        // Data management
+                        dataSection
                         
                         // About
                         aboutSection
@@ -48,122 +46,52 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.large)
-            .onAppear {
-                serverURL = appState.serverURL
-                checkServerStatus()
-            }
-            .alert("Edit Server URL", isPresented: $showingURLEditor) {
-                TextField("Server URL", text: $serverURL)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                
-                Button("Cancel", role: .cancel) {
-                    serverURL = appState.serverURL
-                }
-                
-                Button("Save") {
-                    appState.serverURL = serverURL
-                    checkServerStatus()
+            .alert("Clear History", isPresented: $showingClearAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Clear All", role: .destructive) {
+                    appState.clearHistory()
                 }
             } message: {
-                Text("Enter the URL of your TCG Scanner backend server")
+                Text("Are you sure you want to delete all scanned cards? This cannot be undone.")
             }
         }
     }
     
-    // MARK: - Server Section
+    // MARK: - Status Banner
     
-    private var serverSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            SectionHeader(title: "Server Connection", icon: "server.rack")
-            
-            VStack(spacing: 16) {
-                // Server URL
-                Button(action: { showingURLEditor = true }) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Server URL")
-                                .font(.subheadline)
-                                .foregroundColor(.white.opacity(0.6))
-                            
-                            Text(appState.serverURL)
-                                .font(.system(.body, design: .monospaced))
-                                .foregroundColor(.white)
-                                .lineLimit(1)
-                        }
-                        
-                        Spacer()
-                        
-                        Image(systemName: "pencil")
-                            .foregroundColor(Color(hex: "00d4ff"))
-                    }
-                    .padding(16)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.white.opacity(0.05))
-                    )
-                }
+    private var statusBanner: some View {
+        HStack(spacing: 16) {
+            ZStack {
+                Circle()
+                    .fill(Color(hex: "00ff88").opacity(0.2))
+                    .frame(width: 50, height: 50)
                 
-                // Server status
-                HStack {
-                    serverStatusIndicator
-                    
-                    Spacer()
-                    
-                    Button(action: checkServerStatus) {
-                        HStack(spacing: 6) {
-                            if isCheckingServer {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: Color(hex: "00d4ff")))
-                                    .scaleEffect(0.8)
-                            } else {
-                                Image(systemName: "arrow.clockwise")
-                            }
-                            
-                            Text("Check")
-                        }
-                        .font(.subheadline)
-                        .foregroundColor(Color(hex: "00d4ff"))
-                    }
-                    .disabled(isCheckingServer)
-                }
-                .padding(16)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.white.opacity(0.05))
-                )
+                Image(systemName: "checkmark.icloud.fill")
+                    .font(.title2)
+                    .foregroundColor(Color(hex: "00ff88"))
             }
-        }
-    }
-    
-    private var serverStatusIndicator: some View {
-        HStack(spacing: 10) {
-            Circle()
-                .fill(serverStatusColor)
-                .frame(width: 10, height: 10)
             
-            Text(serverStatusText)
-                .font(.subheadline)
-                .foregroundColor(.white)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("100% On-Device")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                
+                Text("No server required • Works offline for scanning")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.6))
+            }
+            
+            Spacer()
         }
-    }
-    
-    private var serverStatusColor: Color {
-        switch serverStatus {
-        case .unknown: return .gray
-        case .checking: return .yellow
-        case .online: return Color(hex: "00ff88")
-        case .offline: return Color(hex: "ff006e")
-        }
-    }
-    
-    private var serverStatusText: String {
-        switch serverStatus {
-        case .unknown: return "Not checked"
-        case .checking: return "Checking..."
-        case .online: return "Connected"
-        case .offline: return "Offline"
-        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(hex: "00ff88").opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color(hex: "00ff88").opacity(0.3), lineWidth: 1)
+                )
+        )
     }
     
     // MARK: - App Info Section
@@ -198,6 +126,48 @@ struct SettingsView: View {
         return String(format: "$%.2f", total)
     }
     
+    // MARK: - Data Section
+    
+    private var dataSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            SectionHeader(title: "Data", icon: "externaldrive")
+            
+            VStack(spacing: 12) {
+                Button(action: { TCGPlayerService.shared.clearCache() }) {
+                    HStack {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .foregroundColor(Color(hex: "00d4ff"))
+                        
+                        Text("Clear Search Cache")
+                            .foregroundColor(.white)
+                        
+                        Spacer()
+                    }
+                }
+                
+                Divider()
+                    .background(Color.white.opacity(0.1))
+                
+                Button(action: { showingClearAlert = true }) {
+                    HStack {
+                        Image(systemName: "trash")
+                            .foregroundColor(Color(hex: "ff006e"))
+                        
+                        Text("Clear Scan History")
+                            .foregroundColor(Color(hex: "ff006e"))
+                        
+                        Spacer()
+                    }
+                }
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.white.opacity(0.05))
+            )
+        }
+    }
+    
     // MARK: - About Section
     
     private var aboutSection: some View {
@@ -205,12 +175,12 @@ struct SettingsView: View {
             SectionHeader(title: "About", icon: "info.circle")
             
             VStack(spacing: 12) {
-                AboutRow(title: "Version", value: "1.0.0")
+                AboutRow(title: "Version", value: "2.0.0")
                 
                 Divider()
                     .background(Color.white.opacity(0.1))
                 
-                AboutRow(title: "Build", value: "2024.1")
+                AboutRow(title: "Build", value: "On-Device Edition")
                 
                 Divider()
                     .background(Color.white.opacity(0.1))
@@ -240,26 +210,24 @@ struct SettingsView: View {
                     .foregroundColor(.white.opacity(0.5))
                 
                 HStack(spacing: 12) {
-                    TechBadge(text: "PyTorch", color: Color(hex: "ee4c2c"))
-                    TechBadge(text: "ResNet50", color: Color(hex: "9d4edd"))
-                    TechBadge(text: "SwiftUI", color: Color(hex: "00d4ff"))
+                    TechBadge(text: "Vision OCR", color: Color(hex: "00d4ff"))
+                    TechBadge(text: "SwiftUI", color: Color(hex: "9d4edd"))
+                    TechBadge(text: "On-Device", color: Color(hex: "00ff88"))
                 }
             }
-        }
-    }
-    
-    // MARK: - Actions
-    
-    private func checkServerStatus() {
-        isCheckingServer = true
-        serverStatus = .checking
-        
-        Task {
-            let isOnline = await APIService.shared.checkHealth(serverURL: appState.serverURL)
             
-            await MainActor.run {
-                serverStatus = isOnline ? .online : .offline
-                isCheckingServer = false
+            // Features
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Features")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.5))
+                    .padding(.top, 8)
+                
+                FeatureRow(icon: "camera.viewfinder", text: "Scan cards with your camera")
+                FeatureRow(icon: "text.viewfinder", text: "Automatic card name detection")
+                FeatureRow(icon: "dollarsign.circle", text: "Real-time prices from TCGPlayer")
+                FeatureRow(icon: "iphone", text: "100% on-device processing")
+                FeatureRow(icon: "wifi.slash", text: "Works offline for scanning")
             }
         }
     }
@@ -356,8 +324,25 @@ struct TechBadge: View {
     }
 }
 
+struct FeatureRow: View {
+    let icon: String
+    let text: String
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundColor(Color(hex: "00d4ff"))
+                .frame(width: 20)
+            
+            Text(text)
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.7))
+        }
+    }
+}
+
 #Preview {
     SettingsView()
         .environmentObject(AppState())
 }
-

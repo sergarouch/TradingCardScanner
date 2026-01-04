@@ -2,7 +2,7 @@
 //  TCGCardScannerApp.swift
 //  TCGCardScanner
 //
-//  Trading Card Scanner App - Scan cards and get prices from TCGPlayer
+//  Trading Card Scanner App - Fully on-device, no server needed!
 //
 
 import SwiftUI
@@ -25,14 +25,34 @@ struct TCGCardScannerApp: App {
 class AppState: ObservableObject {
     @Published var scannedCards: [ScannedCard] = []
     @Published var isScanning: Bool = false
-    @Published var serverURL: String = "http://localhost:5000"
+    
+    init() {
+        loadSavedCards()
+    }
     
     func addScannedCard(_ card: ScannedCard) {
         scannedCards.insert(card, at: 0)
+        saveCards()
     }
     
     func clearHistory() {
         scannedCards.removeAll()
+        saveCards()
+    }
+    
+    // MARK: - Persistence
+    
+    private func saveCards() {
+        if let encoded = try? JSONEncoder().encode(scannedCards) {
+            UserDefaults.standard.set(encoded, forKey: "scannedCards")
+        }
+    }
+    
+    private func loadSavedCards() {
+        if let data = UserDefaults.standard.data(forKey: "scannedCards"),
+           let decoded = try? JSONDecoder().decode([ScannedCard].self, from: data) {
+            scannedCards = decoded
+        }
     }
 }
 
@@ -51,6 +71,7 @@ struct ScannedCard: Identifiable, Codable {
     let imageData: Data?
     let confidence: Double
     let scannedAt: Date
+    let detectedText: String?
     
     init(
         id: UUID = UUID(),
@@ -64,7 +85,8 @@ struct ScannedCard: Identifiable, Codable {
         tcgplayerURL: String? = nil,
         imageData: Data? = nil,
         confidence: Double = 0.0,
-        scannedAt: Date = Date()
+        scannedAt: Date = Date(),
+        detectedText: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -78,129 +100,23 @@ struct ScannedCard: Identifiable, Codable {
         self.imageData = imageData
         self.confidence = confidence
         self.scannedAt = scannedAt
+        self.detectedText = detectedText
     }
-}
-
-// MARK: - API Response Models
-
-struct RecognizeResponse: Codable {
-    let success: Bool
-    let classification: Classification?
-    let perceptualHash: String?
-    let similarCards: [SimilarCard]?
-    let error: String?
     
-    enum CodingKeys: String, CodingKey {
-        case success
-        case classification
-        case perceptualHash = "perceptual_hash"
-        case similarCards = "similar_cards"
-        case error
+    // Create from TCGCard
+    init(from tcgCard: TCGCard, imageData: Data? = nil, confidence: Double = 0.8, detectedText: String? = nil) {
+        self.id = UUID()
+        self.name = tcgCard.name
+        self.setName = tcgCard.setName
+        self.category = tcgCard.category
+        self.marketPrice = tcgCard.marketPrice
+        self.lowPrice = tcgCard.lowPrice
+        self.midPrice = tcgCard.midPrice
+        self.highPrice = tcgCard.highPrice
+        self.tcgplayerURL = tcgCard.productURL
+        self.imageData = imageData
+        self.confidence = confidence
+        self.scannedAt = Date()
+        self.detectedText = detectedText
     }
 }
-
-struct Classification: Codable {
-    let category: String
-    let confidence: Double
-    let predictions: [Prediction]?
-}
-
-struct Prediction: Codable {
-    let category: String
-    let confidence: Double
-}
-
-struct SimilarCard: Codable {
-    let cardId: String
-    let name: String
-    let setName: String
-    let category: String
-    let tcgplayerId: String?
-    let similarity: Double
-    
-    enum CodingKeys: String, CodingKey {
-        case cardId = "card_id"
-        case name
-        case setName = "set_name"
-        case category
-        case tcgplayerId = "tcgplayer_id"
-        case similarity
-    }
-}
-
-struct IdentifyResponse: Codable {
-    let success: Bool
-    let classification: Classification?
-    let cardInfo: CardInfo?
-    let pricing: Pricing?
-    let error: String?
-    
-    enum CodingKeys: String, CodingKey {
-        case success
-        case classification
-        case cardInfo = "card_info"
-        case pricing
-        case error
-    }
-}
-
-struct CardInfo: Codable {
-    let name: String
-    let setName: String
-    let category: String
-    let matchConfidence: Double
-    
-    enum CodingKeys: String, CodingKey {
-        case name
-        case setName = "set_name"
-        case category
-        case matchConfidence = "match_confidence"
-    }
-}
-
-struct Pricing: Codable {
-    let marketPrice: Double?
-    let lowPrice: Double?
-    let midPrice: Double?
-    let highPrice: Double?
-    let condition: String?
-    let tcgplayerUrl: String?
-    
-    enum CodingKeys: String, CodingKey {
-        case marketPrice = "market_price"
-        case lowPrice = "low_price"
-        case midPrice = "mid_price"
-        case highPrice = "high_price"
-        case condition
-        case tcgplayerUrl = "tcgplayer_url"
-    }
-}
-
-struct SearchResponse: Codable {
-    let success: Bool
-    let query: String?
-    let results: [SearchResult]?
-    let error: String?
-}
-
-struct SearchResult: Codable, Identifiable {
-    var id: String { productId }
-    let productId: String
-    let name: String
-    let setName: String
-    let category: String
-    let imageUrl: String?
-    let marketPrice: Double?
-    let tcgplayerUrl: String
-    
-    enum CodingKeys: String, CodingKey {
-        case productId = "product_id"
-        case name
-        case setName = "set_name"
-        case category
-        case imageUrl = "image_url"
-        case marketPrice = "market_price"
-        case tcgplayerUrl = "tcgplayer_url"
-    }
-}
-

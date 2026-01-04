@@ -126,6 +126,18 @@ struct CardResultView: View {
                     .font(.subheadline)
                     .foregroundColor(.white.opacity(0.7))
             }
+            
+            // Detected text (if available)
+            if let detectedText = card.detectedText {
+                HStack(spacing: 8) {
+                    Image(systemName: "text.viewfinder")
+                        .foregroundColor(Color(hex: "00d4ff"))
+                    
+                    Text("Detected: \(detectedText)")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.5))
+                }
+            }
         }
     }
     
