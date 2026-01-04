@@ -118,11 +118,19 @@ class TCGPlayerService {
     private func parseSearchResults(html: String) -> [TCGCard] {
         var cards: [TCGCard] = []
         
-        // Find product listings using regex patterns
-        // Look for product data in the HTML
+        // Try simple approach first
+        cards = parseWithSimpleApproach(html: html)
         
-        // Pattern to find product links and data
-        let productPattern = #"href="(/product/(\d+)/[^"]+)"[^>]*>([^<]+)</a>"#
+        // If that didn't work, try regex parsing
+        if cards.isEmpty {
+            cards = parseWithRegex(html: html)
+        }
+        
+        return cards
+    }
+    
+    private func parseWithRegex(html: String) -> [TCGCard] {
+        var cards: [TCGCard] = []
         let pricePattern = #"\$(\d+(?:,\d{3})*(?:\.\d{2})?)"#
         
         // Split HTML into product sections
@@ -195,11 +203,6 @@ class TCGPlayerService {
                 
                 cards.append(card)
             }
-        }
-        
-        // If regex parsing didn't work well, try a simpler approach
-        if cards.isEmpty {
-            cards = parseWithSimpleApproach(html: html)
         }
         
         return cards

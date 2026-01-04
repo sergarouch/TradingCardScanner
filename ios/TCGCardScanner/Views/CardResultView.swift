@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import SafariServices
 
 struct CardResultView: View {
     let card: ScannedCard
@@ -304,25 +305,6 @@ struct CardResultView: View {
 
 // MARK: - Supporting Views
 
-struct CategoryBadge: View {
-    let text: String
-    let color: Color
-    
-    var body: some View {
-        Text(text)
-            .font(.caption.bold())
-            .foregroundColor(.white)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(color.opacity(0.3))
-            .cornerRadius(20)
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(color.opacity(0.5), lineWidth: 1)
-            )
-    }
-}
-
 struct PriceBox: View {
     let title: String
     let price: Double?
@@ -353,19 +335,6 @@ struct PriceBox: View {
     }
 }
 
-// MARK: - Safari View
-
-import SafariServices
-
-struct SafariView: UIViewControllerRepresentable {
-    let url: URL
-    
-    func makeUIViewController(context: Context) -> SFSafariViewController {
-        return SFSafariViewController(url: url)
-    }
-    
-    func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {}
-}
 
 #Preview {
     CardResultView(card: ScannedCard(
